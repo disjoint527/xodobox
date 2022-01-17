@@ -20,6 +20,7 @@ struct Timer : Epoll::Interface
     }
 
     static constexpr int64_t nanos_per_sec = 1000 * 1000 * 1000;
+    
     void set_timer(int64_t interval, int64_t initial = nanos_per_sec)
     {
         struct itimerspec newValue { { int(interval / nanos_per_sec), int(interval % nanos_per_sec)},
@@ -31,4 +32,3 @@ struct Timer : Epoll::Interface
     int fd = 0;
     int count = 0; 
 };
-

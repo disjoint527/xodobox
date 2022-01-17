@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <string.h>
+#include <errno.h>
 
 struct Epoll
 {
@@ -26,6 +28,10 @@ struct Epoll
                 ptr->process(entry.events);
             }
         }
+        else
+        {
+        	std::cout << "wait" << std::endl;
+        }
     }
     int add( int _fd, Interface * inf )
     {
@@ -36,4 +42,3 @@ struct Epoll
     Epoll() : fd(epoll_create1(0)) { }
     const int fd;
 };
-
