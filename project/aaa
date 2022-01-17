@@ -1,0 +1,55 @@
+#XOD_CONFIG=-DXOD_MAXNAMES=1000 -DXOD_SEC_PER_DAY=14400 -DXOD_MAXDATE=960 -DXOD_MAXDATES=10 -DXOD_MAXDATE_ALIGN=10 -DXOD_INTERVAL=3 -DXOD_GPU_N=2 
+OS_NAME := $(shell uname)
+XOD_CONFIG=-DOSNAME=$(OS_NAME)
+
+ifeq ($(shell uname),Linux)
+    export CXX=/usr/local/bin/clang++
+    export CC=/usr/local/bin/clang
+    GL_LIB= -L/usr/local/cuda/lib64/ -L/home/xodobox/conda/lib -ldl -lpthread -lGL -lrt -lnuma -lXcursor -lXrandr -lXinerama -lX11  #-lcudart -lXi -lglfw3 -lGLEW -lGLU -lXxf86vm -lglfw3
+else
+	export CXX=g++
+	GL_LIB= -lglfw3 -lGLEW -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+endif
+CUDAFLAGS=  --cuda-gpu-arch=sm_52 								\
+	    -fcuda-flush-denormals-to-zero -fcuda-approx-transcendentals 	                \
+	    -Xcuda-ptxas --warn-on-spills							\
+	    -Xcuda-ptxas --warn-on-local-memory-usage 						\
+	    -Xcuda-ptxas --warn-on-double-precision-use 					\
+	    -Xcuda-ptxas --allow-expensive-optimizations=true 					\
+	    -Xcuda-ptxas --opt-level=5								\
+	    -Xcuda-ptxas --fmad=true								\
+	    -Xcuda-ptxas --optimize-float-atomics						\
+	    -Xcuda-ptxas --extensible-whole-program						\
+	    -Xcuda-ptxas --verbose								\
+	    -fcuda-short-ptr									\
+	    -L/usr/local/cuda/lib64 -lcudart_static
+	    #-Xcuda-ptxas --maxrregcount=archmax	 					\
+
+# -DCUDA_API_PER_THREAD_DEFAULT_STREAM
+CONDA_INC=-I$(CONDA_PREFIX)/include
+CONDA_LIB=-L/home/xodobox/conda/lib
+INCLUDES=-I$(XODOBOX_CODE)/reference $(CONDA_INC) -I$(XODOBOX_CODE)/nn/ -I/usr/local/cuda/include -I/usr/local/include -I$(XODOBOX_CODE)/reference/rpclib/include -I$(XODOBOX_CODE)/reference/spdlog/include -I$(XODOBOX_CODE)/reference/json/include
+LIBS=$(CONDA_LIB) -lpthread -latomic -l:libz.a#-lz -lrt -lstdc++fs -lboost_program_options -lrpc -lnuma -ldl
+
+CXXFLAGS=$(INCLUDES) $(LIBS) $(XOD_CONFIG) $(XOD_PATHS) -Os -m64 -std=c++20 -march=native -mtune=native -mavx2 -mbmi2 -mfma -fno-math-errno -mcx16
+GCCFLAGS=$(CXXFLAGS) -mno-vzeroupper -D__DONT_USE_CUDA__
+CLANG_FLAGS=$(CXXFLAGS) -Wshadow -march=native -mllvm -polly -mllvm -polly-parallel -trigraphs -mllvm -x86-use-vzeroupper=0 -fslp-vectorize -ftree-slp-vectorize -funroll-loops -freroll-loops -ftree-vectorize -fmerge-all-constants -fmacro-backtrace-limit=0 -faligned-allocation #-fnew-alignment=32 -faligned-new (pybind11 fails with new alignment) -fdelayed-template-parsing
+BIN=${XODOBOX_BINARY}
+
+CXX_FAST_FLOAT=-ffast-math -freciprocal-math -fassociative-math -ffp-contract=fast
+CXX_NO_FAST_FLOAT=-fno-fast-math -fno-reciprocal-math -fno-finite-math-only -fno-unsafe-math-optimizations
+#-fexcess-precision=standard
+
+NVCC=/usr/local/cuda/bin/nvcc -std=c++14 --gpu-architecture=sm_52  -use_fast_math -fmad=true -ftz=true --compiler-options='-march=native -mavx2 -mbmi2' -DGLM_FORCE_CUDA
+PYLIBEXT=`python3-config --extension-suffix`
+PYBIND_COMMON=-D__PYTHON_BINDINGS__ `python3 -m pybind11 --includes` --shared -fPIC $(CONDA_LIB)
+PYBIND_PYBIND11=-D__PYTHON_BINDINGS_PYBIND11__ $(PYBIND_COMMON) -fsized-deallocation 
+PYBIND_BOOST_PYTHON=-D__PYTHON_BINDINGS_BOOST_PYTHON__ $(PYBIND_COMMON) -lboost_python -lboost_numpy
+#PYBIND_BOOST_PYTHON=-D__PYTHON_BINDINGS_BOOST_PYTHON__ $(PYBIND_COMMON) /home/xodobox/conda/lib/libboost_python38.a /home/xodobox/conda/lib/libboost_python.a
+MAX_REGCOUNT=-Xcuda-ptxas --maxrregcount=
+
+all : datasink
+
+datasink : src/data_sink.cpp
+	$(CXX) -o $(PYTHONPATH)/datasink$(PYLIBEXT) $(PYBIND_PYBIND11) $(INCLUDES) -I/home/xodobox/shared/mlt/nn/feed src/data_sink.cpp $(CLANG_FLAGS) $(CXX_FAST_FLOAT)
+
