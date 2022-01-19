@@ -13,38 +13,9 @@
 #include <include/epoll.hpp>
 #include <include/timerfd.hpp>
 #include <include/sockets.hpp>
+// #include <include/Data_File.hpp>
 #include <thread>
 namespace py = pybind11; 
-
-struct DataFile
-{
-    struct Row
-    {
-        char code[8];
-        uint32_t time;
-        float last;
-        double volume;
-        double amount;
-    };
-
-    uint32_t num_rows = 0;
-    std::array<Row, 32 * 1024 * 1024> book;
-
-    /// Row book[32 * 1024 * 1024]
-    /// book.data() == &book[0]
-    /// book.size() == 32 * 1024 * 1024;
-
-    void add_row(const Row* array, size_t count)
-    {
-        for(size_t i = 0; i < count; ++i)
-        {
-            auto& dst = book[num_rows];
-            auto& src = array[i];
-            dst = src;
-            num_rows++;
-        }
-    }
-};
 
 struct DataFileHolder
 {
@@ -56,11 +27,11 @@ struct DataFileHolder
 
         if(fd_ = open(filename.c_str(), O_CREAT|O_RDWR|O_NOATIME|O_NONBLOCK, S_IRUSR|S_IWUSR ); fd_ >= 0)
         {
-            constexpr size_t size = sizeof(DataFile);
+            constexpr size_t size = sizeof(DataFiles);
             ftruncate(fd_, size);
             if(auto data = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0); data != MAP_FAILED )
             {
-                data_ = (DataFile*)data;
+                data_ = (DataFiles*)data;
             }
             else
             {
@@ -71,12 +42,12 @@ struct DataFileHolder
         std::cout << "fd=" << fd_ << ", data=" << data_ << std::endl;
     }
     int fd_ = -1;
-    DataFile * data_ = nullptr;
+    DataFiles * data_ = nullptr;
 };
 
 PYBIND11_MODULE(datasink, m) {
 
-    PYBIND11_NUMPY_DTYPE(DataFile::Row, code, time, last, volume, amount);
+    PYBIND11_NUMPY_DTYPE(DataFiles::Row, code, time, last, volume, amount);
 
     py::class_<Epoll>(m,"Epoll")
         .def(py::init<>())
@@ -94,15 +65,15 @@ PYBIND11_MODULE(datasink, m) {
         .def(py::init<std::string>())
         .def_property_readonly("book", [](DataFileHolder const& o)
                                        {
-                                            return py::array_t<DataFile::Row>
+                                            return py::array_t<DataFiles::Row>
                                             { 
                                                 {o.data_->num_rows},
-                                                {sizeof(DataFile::Row)},
+                                                {sizeof(DataFiles::Row)},
                                                 o.data_->book.data(),
                                                 pybind11::str{}
                                             };
                                        })
-        .def("add_row", [](DataFileHolder& o, py::array_t<DataFile::Row> array)
+        .def("add_row", [](DataFileHolder& o, py::array_t<DataFiles::Row> array)
                         {
                             o.data_ -> add_row(array.data(), array.size());
                         })

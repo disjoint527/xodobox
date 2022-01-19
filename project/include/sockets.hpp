@@ -1,4 +1,8 @@
 #include <include/epoll.hpp>
+#include <nlohmann/json.hpp>
+#include <include/Data_File.hpp>
+
+using json = nlohmann::json;
 
 struct TcpSocket : Epoll::Interface
 {
@@ -41,7 +45,7 @@ struct TcpSocket : Epoll::Interface
     auto send(const char * data, size_t size)
     {
         auto status = ::send(fd, data, size,  MSG_DONTWAIT | MSG_NOSIGNAL);
-        if(status <= 0) { async_connect(tmp); return false; }
+        if(status <= 0) { async_connect(this); return false; }
         else return true;
     }
 
@@ -100,7 +104,7 @@ struct HttpSocket : TcpSocket
             if(auto header_end = payload.find("\r\n\r\n"); header_end != std::string::npos) 
             {// header finished
                 auto header = std::string(TcpSocket::buffer, header_end + 4); // specify header
-                string con_len = "Content-Length: "
+                std::string con_len = "Content-Length: ";
                 if(auto length_start = header.find(con_len); length_start!= std::string::npos) 
                 {// find length of content
                 	length_start += con_len.size();
@@ -136,24 +140,28 @@ struct yunhq_socket : HttpSocket
 {
     virtual void process_http_data(const char* data, size_t size) override
     {
-        auto js=parse(std::string(data, size));
-        std::vector<DataFile::Row> array;
+    	auto str = std::string(data, size);
+        auto js=json::parse(str);
+        std::vector<DataFiles::Row> array;
         for(auto& x : js["list"])
-        {
-            auto timestamp = x[0].get<int>();
-            auto last = x[1].get<float>();
-            auto volume = x[2].get<double>();
-            auto amount = x[3].get<double>();
+        {	
+        	auto code = x[0].get<int>();
+            auto timestamp = x[1].get<int>();
+            auto last = x[2].get<float>();
+            auto volume = x[3].get<double>();
+            auto amount = x[4].get<double>();
             //array.push_back({ timestamp, last, volume, amount });
-            array.emplace_back({timestamp, last, volume, amount});
+            array.emplace_back(code, timestamp, last, volume, amount);
         }
         store.add_row(array.data(), array.size());
     }
     auto parse(std::string content)
     {
-        auto j3 = json::parse(content)
-        return j3
+        auto j3 = json::parse(content);
+        return j3;
     }
+    DataFiles store;
+    
 };
 
 
