@@ -11,39 +11,12 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include <include/epoll.hpp>
-#include <include/timerfd.hpp>
-#include <include/sockets.hpp>
+//#include <include/sockets.hpp>
+//#include <include/timerfd.hpp>
+#include <include/yhq_source.hpp>
 // #include <include/Data_File.hpp>
 #include <thread>
 namespace py = pybind11; 
-
-struct DataFileHolder
-{
-    DataFileHolder(std::string date)
-    {
-        static constexpr const char * root_path = "/home/xodobox/data/logs/";
-        std::string filename = std::string(root_path) + date;
-        std::cout << filename << std::endl;
-
-        if(fd_ = open(filename.c_str(), O_CREAT|O_RDWR|O_NOATIME|O_NONBLOCK, S_IRUSR|S_IWUSR ); fd_ >= 0)
-        {
-            constexpr size_t size = sizeof(DataFiles);
-            ftruncate(fd_, size);
-            if(auto data = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0); data != MAP_FAILED )
-            {
-                data_ = (DataFiles*)data;
-            }
-            else
-            {
-                close(fd_);
-                fd_ = -1;
-            }
-        }
-        std::cout << "fd=" << fd_ << ", data=" << data_ << std::endl;
-    }
-    int fd_ = -1;
-    DataFiles * data_ = nullptr;
-};
 
 PYBIND11_MODULE(datasink, m) {
 

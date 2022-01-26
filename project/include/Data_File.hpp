@@ -1,3 +1,5 @@
+#include <sys/mman.h>
+
 struct DataFiles
 {
     struct Row
@@ -76,4 +78,36 @@ struct DataFiles
     		}
     	}
     }
+};
+
+struct DataFileHolder
+{
+    DataFileHolder(std::string date)
+    {
+        static constexpr const char * root_path = "/root/xodobox/data/logs/";
+        std::string filename = std::string(root_path) + date;
+        std::cout << filename << std::endl;
+
+        if(fd_ = open(filename.c_str(), O_CREAT|O_RDWR|O_NOATIME|O_NONBLOCK, S_IRUSR|S_IWUSR ); fd_ >= 0)
+        {
+            constexpr size_t size = sizeof(DataFiles);
+            ftruncate(fd_, size);
+            if(auto data = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0); data != MAP_FAILED )
+            {
+                data_ = (DataFiles*)data;
+            }
+            else
+            {
+                close(fd_);
+                fd_ = -1;
+            }
+        }
+        else
+        {
+        	std::cout << strerror(errno) << std::endl;
+        }
+        std::cout << "fd=" << fd_ << ", data=" << data_ << std::endl;
+    }
+    int fd_ = -1;
+    DataFiles * data_ = nullptr;
 };

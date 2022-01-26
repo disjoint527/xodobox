@@ -55,6 +55,10 @@ struct TcpSocket : Epoll::Interface
         fd = socket(AF_INET,SOCK_STREAM,0);
         length = 0;
     }
+    
+    TcpSocket(const TcpSocket&) = delete;
+    // virtual ~TcpSocket(){}
+    
     Epoll& selector;
 
     int fd;
@@ -150,8 +154,8 @@ struct yunhq_socket : HttpSocket
             auto last = x[2].get<float>();
             auto volume = x[3].get<double>();
             auto amount = x[4].get<double>();
-            //array.push_back({ timestamp, last, volume, amount });
-            array.emplace_back(code, timestamp, last, volume, amount);
+            array.push_back({code, timestamp, last, volume, amount });
+            // array.emplace_back(code, timestamp, last, volume, amount);
         }
         store.add_row(array.data(), array.size());
     }
@@ -160,7 +164,14 @@ struct yunhq_socket : HttpSocket
         auto j3 = json::parse(content);
         return j3;
     }
-    DataFiles store;
+        
+    yunhq_socket(DataFiles& store_, uint32_t addr_) : store(store_)
+    {
+    	addr = addr_;
+    }
+    
+    uint32_t addr;
+    DataFiles& store;
     
 };
 
